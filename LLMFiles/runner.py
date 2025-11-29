@@ -1,5 +1,9 @@
 
-import pandas as pd
+from pydub import AudioSegment
 
-df = pd.read_csv("demo-audio-data.csv")
-print(df.head())
+opus_file = "demo-audio.opus"
+wav_file = "demo-audio.wav"
+
+audio = AudioSegment.from_file(opus_file, format="opus")
+audio.export(wav_file, format="wav")
+print("Conversion complete!")
