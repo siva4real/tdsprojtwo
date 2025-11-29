@@ -60,7 +60,7 @@ Core responsibilities:
 1. Retrieve content from each provided URL
 2. Parse instructions, extract required parameters, and identify submission endpoints
 3. Accurately solve presented challenges (utilize available tools as needed)
-4. Submit solutions exclusively to the specified endpoint
+4. Submit solutions exclusively to the specified submission endpoint
 5. Process subsequent URLs until task chain completes, then output END
 
 Operational guidelines:
