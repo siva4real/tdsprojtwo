@@ -1,37 +1,46 @@
+from urllib.parse import urljoin
 from langchain_core.tools import tool
 from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin
 
 @tool
 def get_rendered_html(url: str) -> dict:
     """
-    Fetch and return the fully rendered HTML of a webpage.
+    Retrieves fully rendered HTML content from a webpage using headless browser.
+    
+    This function launches a headless Chromium browser, navigates to the specified
+    URL, waits for network idle state, and extracts the rendered HTML along with
+    all image URLs found on the page.
     """
     print("\nFetching and rendering:", url)
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
+        with sync_playwright() as playwright:
+            # Launch headless browser
+            browser_instance = playwright.chromium.launch(headless=True)
+            webpage = browser_instance.new_page()
 
-            page.goto(url, wait_until="networkidle")
-            content = page.content()
+            # Navigate and wait for page to fully load
+            webpage.goto(url, wait_until="networkidle")
+            html_content = webpage.content()
 
-            browser.close()
+            browser_instance.close()
 
-            # Parse images
-            soup = BeautifulSoup(content, "html.parser")
-            imgs = [urljoin(url, img["src"]) for img in soup.find_all("img", src=True)]
-            if len(content) > 300000:
-                    print("Warning: HTML too large, truncating...")
-                    content = content[:300000] + "... [TRUNCATED DUE TO SIZE]"
+            # Extract image URLs from HTML
+            parser = BeautifulSoup(html_content, "html.parser")
+            image_urls = [urljoin(url, image["src"]) for image in parser.find_all("img", src=True)]
+            
+            # Truncate if content exceeds size limit
+            if len(html_content) > 300000:
+                print("Warning: HTML too large, truncating...")
+                html_content = html_content[:300000] + "... [TRUNCATED DUE TO SIZE]"
+            
             return {
-                "html": content,
-                "images": imgs,
+                "html": html_content,
+                "images": image_urls,
                 "url": url
             }
 
-    except Exception as e:
-        return {"error": f"Error fetching/rendering page: {str(e)}"}
+    except Exception as error:
+        return {"error": f"Error fetching/rendering page: {str(error)}"}
 
 

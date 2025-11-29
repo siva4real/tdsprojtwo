@@ -1,53 +1,55 @@
-from shared_store import BASE64_STORE
 import os
-import base64, uuid
+import base64
+import uuid
 from langchain_core.tools import tool
+from shared_store import BASE64_STORE
+
 @tool
 def encode_image_to_base64(image_path: str) -> str:
     """
-    Encode an image file into a full Base64 string without exposing the binary
-    output to the LLM.
+    Converts an image file to Base64 encoding and returns a reference key.
 
-    This tool reads an image from the given file path, converts it into a
-    Base64-encoded string, and stores the *full* Base64 value in a shared
-    in-memory dictionary (BASE64_STORE). Instead of returning the large Base64
-    blob—which can overwhelm conversation memory, break routing, or cause LLM
-    tool-call loops—the tool returns a lightweight placeholder of the form:
+    This function reads image data from disk, encodes it to Base64, and stores
+    the encoded string in a shared memory cache. Rather than exposing the complete
+    Base64 output (which can be large and overwhelm the conversation context), 
+    it returns a compact reference key in the format:
 
-        BASE64_KEY:<uuid>
+        BASE64_KEY:<unique-identifier>
 
-    The LLM uses this placeholder as the 'answer' during reasoning. Later,
-    the post_request tool detects the placeholder and replaces it with the
-    original Base64 string from BASE64_STORE before submitting it to the server.
+    The reference key can be used by downstream tools (like post_request) which
+    will substitute the actual Base64 string when needed.
 
-    This design prevents:
-    - Extremely large Base64 strings from entering the conversation history
-    - Agent freezing or malformed function calls
-    - Token overflow crashes
-    - Misrouting caused by Base64 being misinterpreted as HTML or a tool call
+    Benefits:
+    - Prevents excessive token usage in conversation history
+    - Avoids malformed tool call issues caused by large string outputs
+    - Reduces memory overhead and improves response handling
+    - Maintains clean separation between encoding and transmission
 
     Parameters
     ----------
     image_path : str
-        The file system path of the image to encode. Can be PNG, JPG, GIF,
-        WEBP, or any binary image format.
+        Path to the image file (PNG, JPG, GIF, WEBP, etc.)
 
     Returns
     -------
     str
-        A small placeholder token referencing the full Base64 string stored
-        in memory, e.g. "BASE64_KEY:4f9d93ea-7e94-4edc-962c-e6f7d358c2a3".
+        Reference key in format "BASE64_KEY:<uuid>" or error message
     """
     try:
-        image_path = os.path.join("LLMFiles", image_path)
-        with open(image_path, "rb") as f:
-            raw = f.read()
+        # Construct full path within working directory
+        full_path = os.path.join("LLMFiles", image_path)
+        
+        # Read binary image data
+        with open(full_path, "rb") as image_file:
+            binary_data = image_file.read()
     
-        encoded = base64.b64encode(raw).decode("utf-8")
+        # Encode to Base64 string
+        base64_string = base64.b64encode(binary_data).decode("utf-8")
 
-        key = str(uuid.uuid4())
-        BASE64_STORE[key] = encoded
+        # Generate unique identifier and store in cache
+        unique_key = str(uuid.uuid4())
+        BASE64_STORE[unique_key] = base64_string
 
-        return f"BASE64_KEY:{key}"
-    except Exception as e:
-        return f"Error occurred: {e}"
+        return f"BASE64_KEY:{unique_key}"
+    except Exception as error:
+        return f"Error occurred: {error}"

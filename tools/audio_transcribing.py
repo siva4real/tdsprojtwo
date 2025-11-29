@@ -1,43 +1,49 @@
+import os
 from langchain.tools import tool
 import speech_recognition as sr
 from pydub import AudioSegment
-import os
 
 @tool
 def transcribe_audio(file_path: str) -> str:
     """
-    Transcribe an MP3 or WAV audio file into text using Google's Web Speech API.
+    Converts audio file content to text using Google Web Speech API.
+
+    Supports both MP3 and WAV formats. MP3 files are automatically converted to
+    WAV format before transcription. Temporary WAV files are cleaned up after
+    processing.
 
     Args:
-        file_path (str): Path to the input audio file (.mp3 or .wav).
+        file_path (str): Relative path to audio file (.mp3 or .wav)
 
     Returns:
-        str: The transcribed text from the audio.
+        str: Transcribed text content or error message
 
-    Notes:
-        - MP3 files are automatically converted to WAV.
-        - Requires `pydub` and `speech_recognition` packages.
-        - Uses Google's free recognize_google() API (requires internet).
+    Dependencies:
+        - pydub: For audio format conversion
+        - speech_recognition: For transcription
+        - Internet connection: Required for Google API
     """
     try:
-        # Convert MP3 → WAV if needed
-        file_path = os.path.join("LLMFiles", file_path)
-        final_path = file_path
-        if file_path.lower().endswith(".mp3"):
-            sound = AudioSegment.from_mp3(file_path)
-            final_path = file_path.replace(".mp3", ".wav")
-            sound.export(final_path, format="wav")
+        # Build full path to audio file
+        full_path = os.path.join("LLMFiles", file_path)
+        working_path = full_path
+        
+        # Handle MP3 to WAV conversion if necessary
+        if full_path.lower().endswith(".mp3"):
+            audio_segment = AudioSegment.from_mp3(full_path)
+            working_path = full_path.replace(".mp3", ".wav")
+            audio_segment.export(working_path, format="wav")
 
-        # Speech recognition
-        recognizer = sr.Recognizer()
-        with sr.AudioFile(final_path) as source:
-            audio_data = recognizer.record(source)
-            text = recognizer.recognize_google(audio_data)
+        # Perform speech-to-text transcription
+        speech_recognizer = sr.Recognizer()
+        with sr.AudioFile(working_path) as audio_source:
+            recorded_audio = speech_recognizer.record(audio_source)
+            transcription = speech_recognizer.recognize_google(recorded_audio)
 
-        # If we converted the file, remove temp wav
-        if final_path != file_path and os.path.exists(final_path):
-            os.remove(final_path)
+        # Clean up temporary WAV file if it was created
+        if working_path != full_path and os.path.exists(working_path):
+            os.remove(working_path)
 
-        return text
-    except Exception as e:
-        return f"Error occurred: {e}"
+        return transcription
+    except Exception as error:
+        return f"Error occurred: {error}"
